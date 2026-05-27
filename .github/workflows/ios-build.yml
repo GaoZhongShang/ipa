@@ -1,0 +1,99 @@
+name: iOS IPA Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout 代码
+        uses: actions/checkout@v4
+
+      - name: 设置 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: '9'
+
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: 安装依赖
+        run: pnpm install
+
+      - name: 构建 Web 项目
+        run: pnpm build
+
+      - name: 初始化 Capacitor iOS 项目
+        run: |
+          # 首次需要 add，后续只需 sync
+          if [ ! -d "ios/App" ]; then
+            npx cap add ios
+          fi
+          npx cap sync ios
+
+      - name: 设置 iOS 部署目标
+        run: |
+          # Capacitor 6 默认 iOS 14.0，保持不变
+          # 如需更低版本（最低 iOS 13.0），需降级到 Capacitor 5
+          echo "iOS 部署目标: $(grep IPHONEOS_DEPLOYMENT_TARGET ios/App/App.xcodeproj/project.pbxproj | head -1 | sed 's/.*= //' | sed 's/;//')"
+
+      - name: 安装 CocoaPods
+        run: |
+          cd ios/App
+          pod install
+
+      - name: 配置 ATS（允许 HTTP 请求）
+        run: |
+          # 在 Info.plist 中添加 NSAppTransportSecurity，允许 HTTP 请求
+          INFO_PLIST="ios/App/App/Info.plist"
+          /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity dict" "$INFO_PLIST" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" "$INFO_PLIST" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" "$INFO_PLIST" 2>/dev/null || true
+          echo "--- Info.plist 验证 ---"
+          /usr/libexec/PlistBuddy -c "Print :NSAppTransportSecurity" "$INFO_PLIST"
+          /usr/libexec/PlistBuddy -c "Print :ITSAppUsesNonExemptEncryption" "$INFO_PLIST"
+
+      - name: 构建 iOS Archive（无签名）
+        run: |
+          cd ios/App
+          WORKSPACE="App.xcworkspace"
+          SCHEME="App"
+
+          xcodebuild clean build \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath "$PWD/build" \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: 打包 IPA
+        run: |
+          # 在 derived data 中找到 .app 文件
+          APP_PATH=$(find ios/App/build -name "*.app" -path "*/Release-iphoneos/*" -type d | head -1)
+          if [ -z "$APP_PATH" ]; then
+            echo "错误: 找不到 .app 文件"
+            find ios/App/build -name "*.app" -type d
+            exit 1
+          fi
+          echo "找到 App: $APP_PATH"
+
+          # 创建 Payload 目录并打包 IPA
+          mkdir -p Payload
+          cp -r "$APP_PATH" Payload/
+          zip -r mobile-office-assistant.ipa Payload
+          echo "IPA 创建完成: $(ls -lh mobile-office-assistant.ipa)"
+
+      - name: 上传 IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: mobile-office-assistant.ipa
+          retention-days: 30
