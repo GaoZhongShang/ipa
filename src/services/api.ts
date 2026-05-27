@@ -1,3 +1,8 @@
+import { mockApi } from "./mockData";
+
+// ─── 开关：设为 true 使用本地 Mock 数据，false 使用真实 API ─────────────────
+export const USE_MOCK = true;
+
 // API 配置
 const BASE_URL = 'http://121.40.174.122:3000/api';
 
@@ -167,6 +172,7 @@ export interface CollectionDTO {
 // ─── Auth 接口 ────────────────────────────────────────────────────────────
 
 export async function login(phone: string, password: string): Promise<LoginResponse> {
+  if (USE_MOCK) return mockApi.login(phone, password);
   return request<LoginResponse>('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ phone, password }),
@@ -174,6 +180,7 @@ export async function login(phone: string, password: string): Promise<LoginRespo
 }
 
 export async function register(phone: string, password: string, name: string): Promise<void> {
+  if (USE_MOCK) return mockApi.register(phone, password, name);
   return request<void>('/auth/register', {
     method: 'POST',
     body: JSON.stringify({ phone, password, name }),
@@ -183,12 +190,14 @@ export async function register(phone: string, password: string, name: string): P
 // ─── Jobs 接口 ────────────────────────────────────────────────────────────
 
 export async function getJobs(page = 0, size = 10): Promise<PageData<JobListDTO>> {
+  if (USE_MOCK) return mockApi.getJobs(page, size);
   return request<PageData<JobListDTO>>(`/jobs?page=${page}&size=${size}`);
 }
 
 export async function searchJobs(
   params: { keyword?: string; city?: string; education?: string; page?: number; size?: number },
 ): Promise<PageData<JobListDTO>> {
+  if (USE_MOCK) return mockApi.searchJobs(params);
   const query = new URLSearchParams();
   if (params.keyword) query.set('keyword', params.keyword);
   if (params.city) query.set('city', params.city);
@@ -199,16 +208,19 @@ export async function searchJobs(
 }
 
 export async function getJobDetail(id: number): Promise<JobDetailDTO> {
+  if (USE_MOCK) return mockApi.getJobDetail(id);
   return request<JobDetailDTO>(`/jobs/${id}`);
 }
 
 export async function getHotJobs(): Promise<JobListDTO[]> {
+  if (USE_MOCK) return mockApi.getHotJobs();
   return request<JobListDTO[]>('/jobs/hot');
 }
 
 // ─── User 接口 ────────────────────────────────────────────────────────────
 
 export async function getUserProfile(): Promise<UserProfile> {
+  if (USE_MOCK) return mockApi.getUserProfile();
   return request<UserProfile>('/user/profile');
 }
 
@@ -219,6 +231,7 @@ export async function updateUserProfile(data: {
   city?: string;
   salaryExpectation?: string;
 }): Promise<void> {
+  if (USE_MOCK) return mockApi.updateUserProfile(data as Record<string, string>);
   return request<void>('/user/profile', {
     method: 'PUT',
     body: JSON.stringify(data),
@@ -228,23 +241,28 @@ export async function updateUserProfile(data: {
 // ─── Collections 接口 ─────────────────────────────────────────────────────
 
 export async function addCollection(jobId: number): Promise<void> {
+  if (USE_MOCK) return mockApi.addCollection(jobId);
   return request<void>(`/collections?jobId=${jobId}`, { method: 'POST' });
 }
 
 export async function removeCollection(jobId: number): Promise<void> {
+  if (USE_MOCK) return mockApi.removeCollection(jobId);
   return request<void>(`/collections/${jobId}`, { method: 'DELETE' });
 }
 
 export async function getCollections(page = 0, size = 20): Promise<PageData<CollectionDTO>> {
+  if (USE_MOCK) return mockApi.getCollections(page, size);
   return request<PageData<CollectionDTO>>(`/collections?page=${page}&size=${size}`);
 }
 
 // ─── Deliveries 接口 ──────────────────────────────────────────────────────
 
 export async function deliverJob(jobId: number): Promise<void> {
+  if (USE_MOCK) return mockApi.deliverJob(jobId);
   return request<void>(`/deliveries?jobId=${jobId}`, { method: 'POST' });
 }
 
 export async function getDeliveries(page = 0, size = 20): Promise<PageData<DeliveryRecordDTO>> {
+  if (USE_MOCK) return mockApi.getDeliveries(page, size);
   return request<PageData<DeliveryRecordDTO>>(`/deliveries?page=${page}&size=${size}`);
 }
